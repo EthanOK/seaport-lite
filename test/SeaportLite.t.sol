@@ -1,0 +1,87 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+import {Test, console} from "forge-std/Test.sol";
+import {SeaportLite} from "../src/SeaportLite.sol";
+import {
+    Order, OrderComponents, OfferItem, ConsiderationItem, OrderType, ItemType
+} from "../src/lib/ConsiderationBase.sol";
+
+contract SeaportLiteTest is Test {
+    SeaportLite public seaportLite;
+
+    function setUp() public {
+        vm.chainId(11155111);
+
+        address flags = address(0x00000000000000ADc04C56Bf30aC9d3c0aAF14dC);
+
+        deployCodeTo("SeaportLite.sol:SeaportLite", flags);
+
+        seaportLite = SeaportLite(flags);
+    }
+
+    function test_eip712Domain() public view {
+        (, string memory name, string memory version,, address verifyingContract,,) = seaportLite.eip712Domain();
+
+        assertEq(name, "Seaport");
+        assertEq(version, "1.5");
+        assertEq(verifyingContract, address(seaportLite));
+    }
+
+    function test_validateSignature() public view {
+        OfferItem[] memory offer = new OfferItem[](1);
+        offer[0] = OfferItem({
+            itemType: ItemType.ERC721,
+            token: 0x97f236E644db7Be9B8308525e6506E4B3304dA7B,
+            identifierOrCriteria: 111,
+            startAmount: 1,
+            endAmount: 1
+        });
+
+        ConsiderationItem[] memory consideration = new ConsiderationItem[](2);
+        consideration[0] = ConsiderationItem({
+            itemType: ItemType.NATIVE,
+            token: address(0),
+            identifierOrCriteria: 0,
+            startAmount: 1082250000000000000,
+            endAmount: 1082250000000000000,
+            recipient: payable(address(0x6278A1E803A76796a3A1f7F6344fE874ebfe94B2))
+        });
+        consideration[1] = ConsiderationItem({
+            itemType: ItemType.NATIVE,
+            token: address(0),
+            identifierOrCriteria: 0,
+            startAmount: 27750000000000000,
+            endAmount: 27750000000000000,
+            recipient: payable(address(0x0000a26b00c1F0DF003000390027140000fAa719))
+        });
+
+        OrderComponents memory orderParameters = OrderComponents({
+            offerer: 0x6278A1E803A76796a3A1f7F6344fE874ebfe94B2,
+            zone: 0x004C00500000aD104D7DBd00e3ae0A5C00560C00,
+            offer: offer,
+            consideration: consideration,
+            orderType: OrderType.FULL_OPEN,
+            startTime: 1686193412,
+            endTime: 1688785412,
+            zoneHash: bytes32(0),
+            salt: 24446860302761739304752683030156737591518664810215442929818227897836383814680,
+            conduitKey: 0x0000007b02230091a7ed01230072f7006a004d60a8d4e71d599b8104250f0000,
+            counter: 0
+        });
+
+        bytes memory signature =
+            hex"30821bc4aefea2829e00d4dcce28c305c93c1d1ef261867ed7279fa9fca6f26548f9ac6263d68a7ea7a530987a7622d5e30ced13be2a3877fdb7f6d3ed37dee91c";
+
+        bytes32 orderhash = seaportLite.getOrderStructHash(orderParameters);
+        assertEq(orderhash, 0x93615616691158f9686e276600f0cc591b902c161aae970f324f908b001d7b25);
+
+        bool isValid = seaportLite.validateSignature(Order(orderParameters, signature));
+        assertEq(isValid, true);
+
+        bytes memory signature_invalid =
+            hex"89f879a6ff075f1342fb313926c36ec3e5c59fe4b369052a865a4858983f410c5b20ec90e59807db86c07a29cf9c2f1475817048429498f48251990957a2cec51b";
+        isValid = seaportLite.validateSignature(Order(orderParameters, signature_invalid));
+        assertEq(isValid, false);
+    }
+}
