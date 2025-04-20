@@ -1,0 +1,21 @@
+{
+  "name": "seaport-lite",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "directories": {
+    "lib": "lib",
+    "test": "test"
+  },
+  "scripts": {
+    "prettier": "prettier --write --plugin=prettier-plugin-solidity 'src/**/*.sol'",
+    "test": "forge test -vvv"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "prettier": "^3.5.3",
+    "prettier-plugin-solidity": "^1.4.2"
+  }
+}

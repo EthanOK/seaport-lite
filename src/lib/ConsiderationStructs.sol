@@ -1,7 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import {BasicOrderType, ItemType, OrderType, Side} from "./ConsiderationEnums.sol";
+import {
+    BasicOrderType,
+    ItemType,
+    OrderType,
+    Side
+} from "./ConsiderationEnums.sol";
 
 struct Order {
     OrderComponents parameters;
