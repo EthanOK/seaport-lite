@@ -171,4 +171,12 @@ contract Consideration is EIP712, ConsiderationBase, Verifiers {
         // Reconstruct 65-byte signature (r + s + v)
         return abi.encodePacked(r, s, v);
     }
+
+    function getRoot(
+        uint256 key,
+        bytes32 leaf,
+        bytes32[] memory proof
+    ) public pure returns (bytes32) {
+        return _getRoot(key, leaf, proof);
+    }
 }

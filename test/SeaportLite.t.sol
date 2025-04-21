@@ -150,4 +150,25 @@ contract SeaportLiteTest is Test {
 
         return orderComponents;
     }
+
+    function test_getBulkOrderRoot() public view {
+        // OrderComponents memory orderComponents = getOrderComponents();
+        uint256 key = 1;
+        bytes32 leaf = 0x519d6c3dbe7fc17053e1a4ab6f1919797ab73fbd9cea67e4f52ec4227ffc4ec9;
+        bytes32[] memory proof = new bytes32[](2);
+        proof[
+            0
+        ] = 0x770d3d9c422e862698be1991122197ea68ea9e5510c0455ec7ee1951bec88a64;
+        proof[
+            1
+        ] = 0x3115835973f9266a5df1c0b9f81fd6305a00725ed85deba0880a1ad117c72763;
+
+        bytes32 root_1 = seaportLite.getRoot(key, leaf, proof);
+
+        key = 0;
+        leaf = 0x770d3d9c422e862698be1991122197ea68ea9e5510c0455ec7ee1951bec88a64;
+        proof[0]=0x519d6c3dbe7fc17053e1a4ab6f1919797ab73fbd9cea67e4f52ec4227ffc4ec9;
+        bytes32 root_0 = seaportLite.getRoot(key, leaf, proof);
+       assertEq(root_0, root_1);
+    }
 }

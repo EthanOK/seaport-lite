@@ -2,7 +2,6 @@
 pragma solidity ^0.8.20;
 
 import { ConsiderationBase } from "./ConsiderationBase.sol";
-
 import {
     BulkOrderProof_keyShift,
     BulkOrderProof_keySize,
@@ -16,7 +15,6 @@ import {
     ThirtyOneBytes,
     TwoWords
 } from "./ConsiderationConstants.sol";
-
 contract Verifiers is ConsiderationBase {
     function _isValidBulkOrderSize(
         uint256 signatureLength
@@ -53,7 +51,7 @@ contract Verifiers is ConsiderationBase {
      *
      * @return bulkOrderHash The bulk order hash.
      */
-    function _computeBulkOrderProof(
+    function _computeBulkOrderProof_assembly(
         bytes memory proofAndSignature,
         bytes32 leaf
     ) internal pure returns (bytes32 bulkOrderHash) {
@@ -116,5 +114,87 @@ contract Verifiers is ConsiderationBase {
             mstore(OneWord, root)
             bulkOrderHash := keccak256(0, TwoWords)
         }
+    }
+
+    function _computeBulkOrderProof(
+        bytes memory proofAndSignature,
+        bytes32 leaf
+    ) internal pure returns (bytes32 bulkOrderHash) {
+        // Declare arguments for the root hash and the height of the proof.
+        bytes32 root;
+        uint256 height;
+        uint256 key;
+        bytes32 proofPrt;
+
+        // Utilize assembly to efficiently derive the root hash using the proof.
+        assembly {
+            // Retrieve the length of the proof, key, and signature combined.
+            let fullLength := mload(proofAndSignature)
+
+            // If proofAndSignature has odd length, it is a compact signature
+            // with 64 bytes.
+            let signatureLength := sub(ECDSA_MaxLength, and(fullLength, 1))
+
+            // Derive height (or depth of tree) with signature and proof length.
+            height := shr(OneWordShift, sub(fullLength, signatureLength))
+
+            // Update the length in memory to only include the signature.
+            mstore(proofAndSignature, signatureLength)
+
+            // Derive the pointer for the key using the signature length.
+            let keyPtr := add(proofAndSignature, add(OneWord, signatureLength))
+
+            // Retrieve the three-byte key using the derived pointer.
+            key := shr(BulkOrderProof_keyShift, mload(keyPtr))
+
+            /// Retrieve pointer to first proof element by applying a constant
+            // for the key size to the derived key pointer.
+            proofPrt := add(keyPtr, BulkOrderProof_keySize)
+        }
+
+        bytes32[] memory proofs = new bytes32[](height);
+
+        for (uint256 i = 0; i < height; i++) {
+            bytes32 proof_;
+            assembly {
+                proof_ := mload(proofPrt)
+                proofPrt := add(proofPrt, OneWord)
+            }
+            proofs[i] = proof_;
+        }
+
+        root = _getRoot(key, leaf, proofs);
+
+        // Retrieve appropriate typehash constant based on height.
+        bytes32 rootTypeHash = _lookupBulkOrderTypehash(height);
+
+        bulkOrderHash = keccak256(abi.encodePacked(rootTypeHash, root));
+    }
+
+    function _getRoot(
+        uint256 key,
+        bytes32 leaf,
+        bytes32[] memory proof
+    ) internal pure returns (bytes32) {
+        bytes32 computedHash = leaf;
+
+        for (uint256 i = 0; i < proof.length; i++) {
+            // If the key is even, we hash the leaf with the sibling on the right
+            if (key % 2 == 0) {
+                computedHash = keccak256(
+                    abi.encodePacked(computedHash, proof[i])
+                );
+            } else {
+                // Otherwise, we hash the sibling on the left with the leaf
+                computedHash = keccak256(
+                    abi.encodePacked(proof[i], computedHash)
+                );
+            }
+            // Move to the next level in the tree
+            key = key / 2;
+        }
+
+        // Return true if the computed hash matches the Merkle root
+        return computedHash;
     }
 }
