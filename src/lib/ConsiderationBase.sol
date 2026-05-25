@@ -127,6 +127,8 @@ contract ConsiderationBase {
         // Derive ConsiderationItem type hash using corresponding type string.
         considerationItemTypehash = keccak256(considerationItemTypeString);
 
+        // EIP-712 encodeType: main type first, then dependencies sorted by type name.
+        // See docs/eip712-type-encoding.md and EIP-712 Definition of encodeType.
         bytes memory orderTypeString = bytes.concat(
             orderComponentsPartialTypeString,
             considerationItemTypeString,

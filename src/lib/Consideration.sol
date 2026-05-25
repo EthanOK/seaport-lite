@@ -41,9 +41,18 @@ contract Consideration is EIP712, ConsiderationBase, Verifiers {
         return orderHash;
     }
 
+    function validateOrder(Order calldata order) external view returns (bool) {
+        require(
+            order.parameters.startTime <= block.timestamp &&
+                order.parameters.endTime >= block.timestamp,
+            "Order expired"
+        );
+        return validateSignature(order);
+    }
+
     function validateSignature(
         Order calldata order
-    ) external view returns (bool) {
+    ) public view returns (bool) {
         // 1. Compute the base order hash from order components
         bytes32 orderHash = hashOrderComponents(order.parameters);
 

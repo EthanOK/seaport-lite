@@ -1,10 +1,92 @@
 # opensea order
 
-## sign bulk order 
+## Documentation
 
-[signbulkorder SDK](https://github.com/EthanOK/signbulkorder-sdk)
+- [EIP-712 `encodeType` ordering (spec + local verification)](docs/eip712-type-encoding.md)
 
-## sign opensea order with EIP712
+## sign bulk order
+
+使用 [bulkorder-sdk](https://www.npmjs.com/package/bulkorder-sdk) 对 Seaport 订单做 EIP-712 签名（单笔或 Bulk Merkle），与 `test/SeaportLite.t.sol` 中的 domain 一致（`Seaport` / `1.5` / chainId `11155111` / verifyingContract `0x00000000000000ADc04C56Bf30aC9d3c0aAF14dC`）。
+
+```bash
+npm install
+cp .env.example .env   # 填入私钥；脚本会将 offerer 设为 signer.address
+npm run sign-order       # 单笔 EIP-712 签名
+npm run sign-bulk-order  # Bulk Merkle 签名（含 proof + index）
+```
+
+```javascript
+import { BulkOrder, EIP_712_BULK_ORDER_TYPE_DEMO } from "bulkorder-sdk";
+import { Wallet } from "ethers";
+
+const domainData = {
+  name: "Seaport",
+  version: "1.5",
+  chainId: 11155111,
+  verifyingContract: "0x00000000000000ADc04C56Bf30aC9d3c0aAF14dC",
+};
+
+const signer = new Wallet(process.env.PRIVATE_KEY);
+
+const orderComponents = {
+  offerer: signer.address,
+  zone: "0x004C00500000aD104D7DBd00e3ae0A5C00560C00",
+  offer: [
+    {
+      itemType: 2,
+      token: "0x97f236E644db7Be9B8308525e6506E4B3304dA7B",
+      identifierOrCriteria: 111n,
+      startAmount: 1n,
+      endAmount: 1n,
+    },
+  ],
+  consideration: [
+    {
+      itemType: 0,
+      token: "0x0000000000000000000000000000000000000000",
+      identifierOrCriteria: 0n,
+      startAmount: 1082250000000000000n,
+      endAmount: 1082250000000000000n,
+      recipient: signer.address,
+    },
+    {
+      itemType: 0,
+      token: "0x0000000000000000000000000000000000000000",
+      identifierOrCriteria: 0n,
+      startAmount: 27750000000000000n,
+      endAmount: 27750000000000000n,
+      recipient: "0x0000a26b00c1F0DF003000390027140000fAa719",
+    },
+  ],
+  orderType: 0,
+  startTime: 1686193412n,
+  endTime: 1688785412n,
+  zoneHash:
+    "0x0000000000000000000000000000000000000000000000000000000000000000",
+  salt: 24446860302761739304752683030156737591518664810215442929818227897836383814680n,
+  conduitKey:
+    "0x0000007b02230091a7ed01230072f7006a004d60a8d4e71d599b8104250f0000",
+  counter: 0n,
+};
+
+const bulkOrder = new BulkOrder(
+  signer,
+  domainData,
+  EIP_712_BULK_ORDER_TYPE_DEMO,
+);
+
+// 单笔
+const single = await bulkOrder.signOrder(orderComponents);
+await bulkOrder.verifyOrder(single, orderComponents.offerer);
+
+// Bulk（多笔时传入数组；单笔树也会生成 bulk 格式签名）
+const bulk = await bulkOrder.signBulkOrder([orderComponents]);
+await bulkOrder.verifyOrders(bulk, orderComponents.offerer);
+```
+
+订单 fixture、签名与 FFI 导出均在 `test/seaport-test.ts`：`export` 供 `SeaportLite.t.sol` 的 `vm.ffi` 使用，`sign` 供 CLI（`npm run sign-order`）。
+
+## sign opensea eip712 order with ethers
 
 ```javascript
 const EIP712OpenSeaMessage = async (signer, chainId) => {
@@ -148,7 +230,7 @@ const EIP712OpenSeaMessage = async (signer, chainId) => {
     zoneHash:
       "0x0000000000000000000000000000000000000000000000000000000000000000",
     salt: BigNumber.from(
-      "24446860302761739304752683030156737591518664810215442929818227897836383814680"
+      "24446860302761739304752683030156737591518664810215442929818227897836383814680",
     ),
     conduitKey:
       "0x0000007b02230091a7ed01230072f7006a004d60a8d4e71d599b8104250f0000",
@@ -159,7 +241,7 @@ const EIP712OpenSeaMessage = async (signer, chainId) => {
     const orderSignature = await signer._signTypedData(
       domainData,
       types,
-      message
+      message,
     );
 
     console.log("orderSignature:" + orderSignature);
@@ -231,3 +313,94 @@ const EIP712OpenSeaMessage = async (signer, chainId) => {
         assertEq(isValid, false);
     }
 ```
+
+## Verify order in contract
+
+`SeaportLite` exposes three view functions used by integrators and tests:
+
+| Function                              | What it checks                                                                                                          |
+| ------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `getOrderStructHash(OrderComponents)` | EIP-712 struct hash of `parameters` (no signature)                                                                      |
+| `validateSignature(Order)`            | ECDSA from `offerer` over the typed-data digest; supports **single** and **bulk** signatures                            |
+| `validateOrder(Order)`                | Same as `validateSignature`, plus `startTime <= block.timestamp <= endTime` (`require`, reverts with `"Order expired"`) |
+
+**Flow inside `validateSignature`:**
+
+1. `orderHash = hashOrderComponents(parameters)`
+2. If signature length matches a bulk order → recompute hash via Merkle proof (`_computeBulkOrderProof`)
+3. `digest = _hashTypedDataV4(orderHash)` (domain: `Seaport` / `1.5` / chainId / `verifyingContract`)
+4. Recover signer from `signature` and compare to `parameters.offerer`
+
+Order + signature must use the same EIP-712 domain as signing (`test/seaport-test.ts`). See [EIP-712 type encoding](docs/eip712-type-encoding.md).
+
+### Example (Forge test, matches `test/SeaportLite.t.sol`)
+
+Orders and signatures come from one FFI call to `test/seaport-test.ts` (`export single` / `export bulk`), so `offerer` and `signature` stay aligned.
+
+```solidity
+import { SeaportLite } from "../src/SeaportLite.sol";
+import { Order, OrderComponents } from "../src/lib/ConsiderationBase.sol";
+
+// seaportLite at 0x00000000000000ADc04C56Bf30aC9d3c0aAF14dC in tests; vm.chainId(11155111)
+
+function test_validateSignature() public {
+    SignedOrderFixture memory fixture = getSignedOrder("single");
+
+    bool isValid = seaportLite.validateOrder(
+        Order(fixture.components, fixture.signature)
+    );
+    assertEq(isValid, true);
+}
+
+function test_validateSignature_BulkOrder() public {
+    SignedOrderFixture memory fixture = getSignedOrder("bulk");
+
+    bool isValid = seaportLite.validateOrder(
+        Order(fixture.components, fixture.signature)
+    );
+    assertEq(isValid, true);
+}
+
+function test_invalidSignature_fails() public {
+    SignedOrderFixture memory fixture = getSignedOrder("single");
+
+    bytes memory signatureInvalid =
+        hex"89f879a6ff075f1342fb313926c36ec3e5c59fe4b369052a865a4858983f410c5b20ec90e59807db86c07a29cf9c2f1475817048429498f48251990957a2cec51b";
+
+    assertFalse(
+        seaportLite.validateSignature(
+            Order(fixture.components, signatureInvalid)
+        )
+    );
+}
+
+/// @dev FFI: npx tsx test/seaport-test.ts export <single|bulk>
+function getSignedOrder(string memory mode)
+    internal
+    returns (SignedOrderFixture memory fixture)
+{
+    string[] memory inputs = new string[](5);
+    inputs[0] = "npx";
+    inputs[1] = "tsx";
+    inputs[2] = "test/seaport-test.ts";
+    inputs[3] = "export";
+    inputs[4] = mode;
+
+    bytes memory encoded = vm.ffi(inputs);
+    (fixture.components, fixture.signature) =
+        abi.decode(encoded, (OrderComponents, bytes));
+
+    assertEq(
+        fixture.components.offerer,
+        EXPECTED_OFFERER,
+        "offerer must match PRIVATE_KEY in .env"
+    );
+}
+```
+
+```bash
+cp .env.example .env   # PRIVATE_KEY required for FFI
+forge test --match-contract SeaportLiteTest -vvv
+```
+
+**Note:** `npm run sign-order` uses wall-clock timestamps; Forge tests use `export` with `forForge` times. Do not paste CLI signatures into tests. Details in `test/seaport-test.ts` and `docs/eip712-type-encoding.md`.

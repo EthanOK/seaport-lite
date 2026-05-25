@@ -9,13 +9,23 @@
   },
   "scripts": {
     "prettier": "prettier --write --plugin=prettier-plugin-solidity 'src/**/*.sol'",
-    "test": "forge test -vvv"
+    "test": "forge test -vvv",
+    "sign-order": "tsx test/seaport-test.ts sign single",
+    "sign-bulk-order": "tsx test/seaport-test.ts sign bulk",
+    "export-signed-order": "tsx test/seaport-test.ts export single"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "devDependencies": {
     "prettier": "^3.5.3",
-    "prettier-plugin-solidity": "^1.4.2"
+    "prettier-plugin-solidity": "^1.4.2",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3"
+  },
+  "dependencies": {
+    "bulkorder-sdk": "^0.0.4",
+    "dotenv": "^17.4.2",
+    "ethers": "^6.16.0"
   }
 }
