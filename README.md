@@ -419,12 +419,6 @@ function getSignedOrder(
     encoded,
     (OrderComponents, bytes)
   );
-
-  assertEq(
-    fixture.components.offerer,
-    EXPECTED_OFFERER,
-    "offerer must match PRIVATE_KEY in .env"
-  );
 }
 ```
 

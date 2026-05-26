@@ -15,10 +15,6 @@ export const SEAPORT_LITE_ADDRESS =
   "0x00000000000000ADc04C56Bf30aC9d3c0aAF14dC" as const;
 export const CHAIN_ID = 11155111;
 
-/** Must match EXPECTED_OFFERER in test/SeaportLite.t.sol and .env.example PRIVATE_KEY */
-export const EXPECTED_OFFERER =
-  "0x64c21F01dDFAaA90f55042428C6E22FB5aE10890" as const;
-
 const THIRTY_DAYS_SECONDS = 30n * 24n * 60n * 60n;
 
 const ORDER_COMPONENTS_ABI =

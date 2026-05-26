@@ -23,6 +23,15 @@ jobs:
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1
 
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Install npm dependencies
+        run: npm ci
+
       - name: Show Forge version
         run: |
           forge --version
@@ -33,6 +42,8 @@ jobs:
         id: build
 
       - name: Run Forge tests
-        run: |
-          forge test -vvv
+        env:
+          # Anvil account #0 — offerer derived from this key in test/helpers (wallet.ts)
+          PRIVATE_KEY: "0xac0974bec39a17e36ba4a708189bfffc19b23c8366c0f7191469a6031bbc4339"
+        run: forge test -vvv
         id: test

@@ -14,9 +14,6 @@ import {
 } from "../src/variants/CustomConsiderationConstants.sol";
 
 contract CustomBulkSeaportTest is Test {
-    address internal constant EXPECTED_OFFERER =
-        0x64c21F01dDFAaA90f55042428C6E22FB5aE10890;
-
     address internal constant CUSTOM_BULK_DEPLOY =
         0x00000000000000000000000000000000000000DE;
 
@@ -87,6 +84,5 @@ contract CustomBulkSeaportTest is Test {
             encoded,
             (CustomOrderComponents, bytes)
         );
-        assertEq(f.components.offerer, EXPECTED_OFFERER);
     }
 }

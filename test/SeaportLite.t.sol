@@ -9,10 +9,6 @@ import {
     BulkOrder_Typehash_Height_One
 } from "../src/lib/ConsiderationConstants.sol";
 contract SeaportLiteTest is Test {
-    /// Must match Wallet(PRIVATE_KEY) in .env — see test/helpers/seaport-test.ts
-    address internal constant EXPECTED_OFFERER =
-        0x64c21F01dDFAaA90f55042428C6E22FB5aE10890;
-
     SeaportLite public seaportLite;
     BulkOrderTypeHashHelp public bulkOrderTypeHash;
 
@@ -49,8 +45,9 @@ contract SeaportLiteTest is Test {
         assertEq(verifyingContract, address(seaportLite));
     }
 
-    function test_getCounter_defaultsToZero() public view {
-        assertEq(seaportLite.getCounter(EXPECTED_OFFERER), 0);
+    function test_getCounter_defaultsToZero() public {
+        SignedOrderFixture memory fixture = getSignedOrder("single");
+        assertEq(seaportLite.getCounter(fixture.components.offerer), 0);
     }
 
     function test_validateSignature() public {
@@ -67,11 +64,12 @@ contract SeaportLiteTest is Test {
 
         vm.roll(100);
         vm.setBlockhash(99, bytes32(uint256(100) << 128));
-        vm.prank(EXPECTED_OFFERER);
+        address offerer = fixture.components.offerer;
+        vm.prank(offerer);
         uint256 newCounter = seaportLite.incrementCounter();
 
         assertEq(newCounter, 100);
-        assertEq(seaportLite.getCounter(EXPECTED_OFFERER), 100);
+        assertEq(seaportLite.getCounter(offerer), 100);
 
         assertFalse(
             seaportLite.validateOrder(
@@ -129,11 +127,6 @@ contract SeaportLiteTest is Test {
         (fixture.components, fixture.signature) = abi.decode(
             encoded,
             (OrderComponents, bytes)
-        );
-        assertEq(
-            fixture.components.offerer,
-            EXPECTED_OFFERER,
-            "offerer must match PRIVATE_KEY in .env"
         );
     }
 
