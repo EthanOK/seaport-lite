@@ -8,14 +8,18 @@ import {
     ConsiderationItem,
     Order
 } from "./ConsiderationStructs.sol";
-import { InvalidBulkOrder } from "./ConsiderationEventsAndErrors.sol";
+import {
+    InvalidBulkOrder,
+    InvalidCounter
+} from "./ConsiderationEventsAndErrors.sol";
+import { CounterManager } from "./CounterManager.sol";
 import { Verifiers } from "./Verifiers.sol";
 import { EIP712 } from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 import {
     SignatureChecker
 } from "@openzeppelin/contracts/utils/cryptography/SignatureChecker.sol";
 
-contract Consideration is EIP712, ConsiderationBase, Verifiers {
+contract Consideration is EIP712, ConsiderationBase, CounterManager, Verifiers {
     bytes32 internal immutable _NAME_HASH;
     bytes32 internal immutable _VERSION_HASH;
     bytes32 internal immutable _EIP_712_DOMAIN_TYPEHASH;
@@ -47,6 +51,7 @@ contract Consideration is EIP712, ConsiderationBase, Verifiers {
                 order.parameters.endTime >= block.timestamp,
             "Order expired"
         );
+        _assertValidCounter(order.parameters);
         return validateSignature(order);
     }
 
@@ -93,6 +98,13 @@ contract Consideration is EIP712, ConsiderationBase, Verifiers {
 
     function getDigest(bytes32 orderHash) internal view returns (bytes32) {
         return _hashTypedDataV4(orderHash);
+    }
+
+    function _assertValidCounter(OrderComponents calldata order) internal view {
+        uint256 currentCounter = _getCounter(order.offerer);
+        if (order.counter != currentCounter) {
+            revert InvalidCounter(order.counter, currentCounter);
+        }
     }
 
     // calculate OrderComponents's structHash

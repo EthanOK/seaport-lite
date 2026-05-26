@@ -8,6 +8,7 @@ import { BulkOrderTypeHashHelp } from "../src/lib/BulkOrderTypeHashHelp.sol";
 import {
     BulkOrder_Typehash_Height_One
 } from "../src/lib/ConsiderationConstants.sol";
+import { InvalidCounter } from "../src/lib/ConsiderationEventsAndErrors.sol";
 
 contract SeaportLiteTest is Test {
     /// Must match Wallet(PRIVATE_KEY) in .env — see test/seaport-test.ts
@@ -50,6 +51,10 @@ contract SeaportLiteTest is Test {
         assertEq(verifyingContract, address(seaportLite));
     }
 
+    function test_getCounter_defaultsToZero() public view {
+        assertEq(seaportLite.getCounter(EXPECTED_OFFERER), 0);
+    }
+
     function test_validateSignature() public {
         SignedOrderFixture memory fixture = getSignedOrder("single");
 
@@ -57,6 +62,29 @@ contract SeaportLiteTest is Test {
             Order(fixture.components, fixture.signature)
         );
         assertEq(isValid, true);
+    }
+
+    function test_incrementCounter_invalidatesPriorOrders() public {
+        SignedOrderFixture memory fixture = getSignedOrder("single");
+
+        vm.roll(100);
+        vm.setBlockhash(99, bytes32(uint256(100) << 128));
+        vm.prank(EXPECTED_OFFERER);
+        uint256 newCounter = seaportLite.incrementCounter();
+
+        assertEq(newCounter, 100);
+        assertEq(seaportLite.getCounter(EXPECTED_OFFERER), 100);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                InvalidCounter.selector,
+                uint256(0),
+                uint256(100)
+            )
+        );
+        seaportLite.validateOrder(
+            Order(fixture.components, fixture.signature)
+        );
     }
 
     function test_invalidSignature_fails() public {
