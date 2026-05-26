@@ -1,0 +1,35 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+// Stub: copy to src/MySeaportLite.sol — custom fields inside OrderComponents, name unchanged.
+
+import { EIP712 } from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
+import {
+    SignatureChecker
+} from "@openzeppelin/contracts/utils/cryptography/SignatureChecker.sol";
+import { CounterManager } from "./lib/CounterManager.sol";
+import { Verifiers } from "./lib/Verifiers.sol";
+// import { OrderComponents, Order } from "./lib/ConsiderationStructs.sol";
+
+/// @title MySeaportLite
+/// @notice OrderComponents (custom members) + Bulk verify — no fulfill
+contract MySeaportLite is EIP712, CounterManager, Verifiers {
+    bytes32 internal immutable _ORDER_TYPEHASH;
+    bytes32 internal immutable _OFFER_ITEM_TYPEHASH;
+    bytes32 internal immutable _CONSIDERATION_ITEM_TYPEHASH;
+
+    constructor() EIP712("MyMarket", "1.0") {
+        // Derive from updated encodeType strings — primary type still "OrderComponents"
+        // (_ORDER_TYPEHASH, _OFFER_ITEM_TYPEHASH, _CONSIDERATION_ITEM_TYPEHASH) =
+        //     _deriveTypehashes();
+    }
+
+    // function getOrderStructHash(OrderComponents calldata order) external view returns (bytes32);
+    // function validateSignature(Order calldata order) public view returns (bool);
+    // function validateOrder(Order calldata order) external view returns (bool);
+    // function hashOrderComponents(OrderComponents calldata order) internal view returns (bytes32) {
+    //     // abi.encode(..., _getCounter(order.offerer)) for the counter slot
+    // }
+
+    // Bulk: _isValidBulkOrderSize + _computeBulkOrderProof; leaf remains OrderComponents structHash
+}

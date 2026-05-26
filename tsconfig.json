@@ -9,5 +9,5 @@
     "resolveJsonModule": true,
     "noEmit": true
   },
-  "include": ["test/**/*.ts"]
+  "include": ["test/helpers/**/*.ts"]
 }

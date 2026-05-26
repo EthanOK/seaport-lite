@@ -2,15 +2,12 @@
  * Seaport-lite test helpers: fixtures, signing, FFI export, CLI.
  *
  * Usage:
- *   tsx test/seaport-test.ts sign [single|bulk]     # print signature (CLI)
- *   tsx test/seaport-test.ts export [single|bulk]   # ABI stdout for forge vm.ffi
+ *   tsx test/helpers/seaport-test.ts sign [single|bulk]     # print signature (CLI)
+ *   tsx test/helpers/seaport-test.ts export [single|bulk]   # ABI stdout for forge vm.ffi
  */
-import "dotenv/config";
-import {
-  BulkOrder,
-  EIP_712_BULK_ORDER_TYPE_DEMO,
-} from "bulkorder-sdk";
-import { AbiCoder, TypedDataEncoder, Wallet } from "ethers";
+import { BulkOrder, EIP_712_BULK_ORDER_TYPE_DEMO } from "bulkorder-sdk";
+import { AbiCoder, TypedDataEncoder } from "ethers";
+import { requireSigner, resolveOfferer } from "./wallet";
 
 // --- constants ---
 
@@ -76,7 +73,7 @@ export function getOrderTimeWindow(options?: FixtureOptions): {
 
 export function getDemoOrderComponents(
   offerer: string,
-  options?: FixtureOptions
+  options?: FixtureOptions,
 ): SeaportOrderComponents {
   const { startTime, endTime } = getOrderTimeWindow(options);
 
@@ -156,38 +153,15 @@ function orderComponentsTuple(o: SeaportOrderComponents) {
 
 export function encodeSignedOrder(
   o: SeaportOrderComponents,
-  signature: string
+  signature: string,
 ): string {
   return AbiCoder.defaultAbiCoder().encode(
     [ORDER_COMPONENTS_ABI, "bytes"],
-    [orderComponentsTuple(o), signature]
+    [orderComponentsTuple(o), signature],
   );
 }
 
 // --- signing ---
-
-export function requireSigner(): Wallet {
-  const privateKey = process.env.PRIVATE_KEY;
-  if (!privateKey) {
-    console.error("PRIVATE_KEY is required in .env or the environment.");
-    process.exit(1);
-  }
-  return new Wallet(privateKey);
-}
-
-export function resolveOfferer(cliOfferer?: string): string {
-  const signer = requireSigner();
-  if (
-    cliOfferer &&
-    cliOfferer.toLowerCase() !== signer.address.toLowerCase()
-  ) {
-    console.error(
-      `offerer mismatch: passed ${cliOfferer}, wallet is ${signer.address}`
-    );
-    process.exit(1);
-  }
-  return signer.address;
-}
 
 function getSeaportDomain() {
   return {
@@ -200,26 +174,22 @@ function getSeaportDomain() {
 
 export function orderHash(orderComponents: SeaportOrderComponents): string {
   const { BulkOrder: _b, ...types } = EIP_712_BULK_ORDER_TYPE_DEMO;
-  return TypedDataEncoder.hashStruct(
-    "OrderComponents",
-    types,
-    orderComponents
-  );
+  return TypedDataEncoder.hashStruct("OrderComponents", types, orderComponents);
 }
 
 export async function signOrder(
   mode: SignMode,
-  signer: Wallet = requireSigner(),
-  fixtureOptions?: FixtureOptions
+  signer = requireSigner(),
+  fixtureOptions?: FixtureOptions,
 ): Promise<{ orderComponents: SeaportOrderComponents; signature: string }> {
   const orderComponents = getDemoOrderComponents(
     signer.address,
-    fixtureOptions
+    fixtureOptions,
   );
   const bulkOrder = new BulkOrder<SeaportOrderComponents>(
     signer,
     getSeaportDomain(),
-    EIP_712_BULK_ORDER_TYPE_DEMO
+    EIP_712_BULK_ORDER_TYPE_DEMO,
   );
 
   if (mode === "bulk") {
@@ -283,8 +253,8 @@ async function main(): Promise<void> {
     default:
       console.error(
         "Usage:\n" +
-          "  tsx test/seaport-test.ts sign <single|bulk>\n" +
-          "  tsx test/seaport-test.ts export <single|bulk> [offerer]"
+          "  tsx test/helpers/seaport-test.ts sign <single|bulk>\n" +
+          "  tsx test/helpers/seaport-test.ts export <single|bulk> [offerer]",
       );
       process.exit(1);
   }

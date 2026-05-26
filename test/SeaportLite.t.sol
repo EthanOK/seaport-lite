@@ -8,10 +8,8 @@ import { BulkOrderTypeHashHelp } from "../src/lib/BulkOrderTypeHashHelp.sol";
 import {
     BulkOrder_Typehash_Height_One
 } from "../src/lib/ConsiderationConstants.sol";
-import { InvalidCounter } from "../src/lib/ConsiderationEventsAndErrors.sol";
-
 contract SeaportLiteTest is Test {
-    /// Must match Wallet(PRIVATE_KEY) in .env — see test/seaport-test.ts
+    /// Must match Wallet(PRIVATE_KEY) in .env — see test/helpers/seaport-test.ts
     address internal constant EXPECTED_OFFERER =
         0x64c21F01dDFAaA90f55042428C6E22FB5aE10890;
 
@@ -75,15 +73,10 @@ contract SeaportLiteTest is Test {
         assertEq(newCounter, 100);
         assertEq(seaportLite.getCounter(EXPECTED_OFFERER), 100);
 
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                InvalidCounter.selector,
-                uint256(0),
-                uint256(100)
+        assertFalse(
+            seaportLite.validateOrder(
+                Order(fixture.components, fixture.signature)
             )
-        );
-        seaportLite.validateOrder(
-            Order(fixture.components, fixture.signature)
         );
     }
 
@@ -121,14 +114,14 @@ contract SeaportLiteTest is Test {
         assertEq(bulkOrderTypeHashs[0], bytes32(BulkOrder_Typehash_Height_One));
     }
 
-    /// @dev One FFI call to test/seaport-test.ts — order + signature from same PRIVATE_KEY
+    /// @dev One FFI call to test/helpers/seaport-test.ts — order + signature from same PRIVATE_KEY
     function getSignedOrder(
         string memory mode
     ) internal returns (SignedOrderFixture memory fixture) {
         string[] memory inputs = new string[](5);
         inputs[0] = "npx";
         inputs[1] = "tsx";
-        inputs[2] = "test/seaport-test.ts";
+        inputs[2] = "test/helpers/seaport-test.ts";
         inputs[3] = "export";
         inputs[4] = mode;
 

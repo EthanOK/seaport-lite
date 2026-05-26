@@ -6,13 +6,13 @@ How `ConsiderationBase._deriveTypehashes()` builds `orderTypeString`: **the orde
 
 ## Where is the order specified?
 
-| Location | States “dependencies sorted by name”? |
-|----------|--------------------------------------|
-| [EIP-712 `encodeType`](https://eips.ethereum.org/EIPS/eip-712#definition-of-encodetype) | **Yes** (normative spec) |
-| `src/lib/ConsiderationBase.sol` (lines ~130–139) | **No** (only `bytes.concat`; see short comment + this doc) |
-| `docs/eip712-type-encoding.md` (this file) | **Yes** (explanation) |
+| Location                                                                                | States “dependencies sorted by name”?                      |
+| --------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
+| [EIP-712 `encodeType`](https://eips.ethereum.org/EIPS/eip-712#definition-of-encodetype) | **Yes** (normative spec)                                   |
+| `src/lib/ConsiderationBase.sol` (lines ~130–139)                                        | **No** (only `bytes.concat`; see short comment + this doc) |
+| `docs/eip712-type-encoding.md` (this file)                                              | **Yes** (explanation)                                      |
 
-The three-part concat in the contract follows EIP-712. If the code does not explain *why* that order is used, read the spec or this document.
+The three-part concat in the contract follows EIP-712. If the code does not explain _why_ that order is used, read the spec or this document.
 
 ---
 
@@ -50,11 +50,11 @@ Transaction(Person from,Person to,Asset tx)Asset(address token,uint256 amount)Pe
 
 Split into three parts:
 
-| Order | Segment | Meaning |
-|-------|---------|---------|
-| 1 | `Transaction(Person from,Person to,Asset tx)` | **Primary type** |
-| 2 | `Asset(address token,uint256 amount)` | Dependency named **Asset** |
-| 3 | `Person(address wallet,string name)` | Dependency named **Person** |
+| Order | Segment                                       | Meaning                     |
+| ----- | --------------------------------------------- | --------------------------- |
+| 1     | `Transaction(Person from,Person to,Asset tx)` | **Primary type**            |
+| 2     | `Asset(address token,uint256 amount)`         | Dependency named **Asset**  |
+| 3     | `Person(address wallet,string name)`          | Dependency named **Person** |
 
 `Transaction` references `Person` and `Asset`. Alphabetically: **Asset < Person**, so append order is **Asset → Person** (matches the example).
 
@@ -69,10 +69,10 @@ Split into three parts:
 
 Dependency type names:
 
-| Type name | First letter |
-|-----------|--------------|
-| `ConsiderationItem` | C |
-| `OfferItem` | O |
+| Type name           | First letter |
+| ------------------- | ------------ |
+| `ConsiderationItem` | C            |
+| `OfferItem`         | O            |
 
 Alphabetically: **ConsiderationItem < OfferItem** → append **ConsiderationItem**, then **OfferItem**.
 
@@ -146,10 +146,10 @@ cast keccak "OrderComponents(address offerer,address zone,OfferItem[] offer,Cons
 
 **Expected hashes (match `ConsiderationBase` / deployed `_ORDER_TYPEHASH`):**
 
-| Name | Value |
-|------|-------|
-| `orderTypehash` | `0xfa445660b7e21515a59617fcd68910b487aa5808b8abda3d78bc85df364b2c2f` |
-| `offerItemTypehash` | `0xa66999307ad1bb4fde44d13a5d710bd7718e0c87c1eef68a571629fbf5b93d02` |
+| Name                        | Value                                                                |
+| --------------------------- | -------------------------------------------------------------------- |
+| `orderTypehash`             | `0xfa445660b7e21515a59617fcd68910b487aa5808b8abda3d78bc85df364b2c2f` |
+| `offerItemTypehash`         | `0xa66999307ad1bb4fde44d13a5d710bd7718e0c87c1eef68a571629fbf5b93d02` |
 | `considerationItemTypehash` | `0x42d81c6929ffdc4eb27a0808e40e82516ad42296c166065de7f812492304ff6e` |
 
 Per dependency type:
@@ -161,31 +161,49 @@ cast keccak "ConsiderationItem(uint8 itemType,address token,uint256 identifierOr
 
 ---
 
+## Counter in `structHash` (verify)
+
+`Consideration.hashOrderComponents` / `CustomConsideration.hashOrderComponents` encode **`_getCounter(offerer)`** from storage into the EIP-712 struct hash (aligned with official Seaport verify behavior).
+
+- **Off-chain:** the `counter` field in typed data should equal `getCounter(offerer)` when the user signs.
+- **`validateOrder`:** does not separately `require(order.counter == getCounter(...))`; a mismatch between calldata `order.counter` and storage only matters if it differs from what was signed.
+- **`incrementCounter()`:** changes storage → old signatures no longer verify.
+
+---
+
 ## TypeScript / `bulkorder-sdk`
 
-- Script: `test/seaport-test.ts`
-- Schema: `EIP_712_BULK_ORDER_TYPE_DEMO` from `bulkorder-sdk`
-- ethers `TypedDataEncoder` uses the same EIP-712 rules; if you change Solidity type strings, update the TS schema too.
+- **SeaportLite:** `test/helpers/seaport-test.ts` — schema from `bulkorder-sdk` (`EIP_712_BULK_ORDER_TYPE_DEMO`)
+- **CustomBulkSeaport:** `test/helpers/custom-bulk-eip712.ts` + `custom-bulk-seaport-test.ts` — custom `OrderComponents` members; EIP-712 type **names** unchanged
+- ethers `TypedDataEncoder` uses the same EIP-712 rules; if you change Solidity type strings, update the TS schema too
+- For custom types, declare `Record<string, TypedDataField[]>` (avoid `as const` on the whole types object — see `custom-bulk-eip712.ts`)
 
 ---
 
 ## Do not confuse: `BulkOrderTypeHashHelp`
 
-`src/lib/BulkOrderTypeHashHelp.sol` → `getTreeSubTypes()`:
+| Layout              | Helper                                         | `getTreeSubTypes()` tail                                                  |
+| ------------------- | ---------------------------------------------- | ------------------------------------------------------------------------- |
+| `SeaportLite`       | `src/lib/BulkOrderTypeHashHelp.sol`            | Standard `OrderComponents` (zone, zoneHash, conduitKey, …)                |
+| `CustomBulkSeaport` | `src/variants/CustomBulkOrderTypeHashHelp.sol` | Slimmer `OrderComponents` members — same **type names**, different fields |
+
+Both append dependency strings in this order:
 
 ```text
 ConsiderationItem + OfferItem + OrderComponents
 ```
 
-Used for **bulk Merkle tree** composite types, **not** for EIP-712 `encodeType(OrderComponents)`. Bulk verification uses `Verifiers._lookupBulkOrderTypehash(height)`.
+Used for **bulk Merkle tree** composite types, **not** for EIP-712 `encodeType(OrderComponents)` alone. Bulk verification uses `_lookupBulkOrderTypehash(height)` (`ConsiderationBase` or `CustomConsiderationBase`).
 
 ---
 
 ## Other debugging
 
 ```bash
-npm run sign-order          # CLI: print orderHash / signature
+npm run sign-order          # SeaportLite CLI
+npm run sign-order-custom-bulk   # CustomBulkSeaport CLI
 forge test --match-contract SeaportLiteTest -vvv
+forge test --match-contract CustomBulkSeaportTest -vvv
 ```
 
 ```solidity
@@ -196,10 +214,10 @@ seaportLite.getOrderStructHash(orderComponents);  // structHash (includes encode
 
 ## References
 
-| Document | URL |
-|----------|-----|
-| EIP-712 | https://eips.ethereum.org/EIPS/eip-712 |
-| encodeType | https://eips.ethereum.org/EIPS/eip-712#definition-of-encodetype |
-| hashStruct | https://eips.ethereum.org/EIPS/eip-712#definition-of-hashstruct |
-| OpenZeppelin EIP712 | https://docs.openzeppelin.com/contracts/4.x/api/utils#EIP712 |
-| Seaport overview | https://docs.opensea.io/docs/seaport-overview |
+| Document            | URL                                                             |
+| ------------------- | --------------------------------------------------------------- |
+| EIP-712             | https://eips.ethereum.org/EIPS/eip-712                          |
+| encodeType          | https://eips.ethereum.org/EIPS/eip-712#definition-of-encodetype |
+| hashStruct          | https://eips.ethereum.org/EIPS/eip-712#definition-of-hashstruct |
+| OpenZeppelin EIP712 | https://docs.openzeppelin.com/contracts/4.x/api/utils#EIP712    |
+| Seaport overview    | https://docs.opensea.io/docs/seaport-overview                   |

@@ -8,11 +8,13 @@
     "test": "test"
   },
   "scripts": {
-    "prettier": "prettier --write --plugin=prettier-plugin-solidity 'src/**/*.sol'",
+    "prettier": "prettier --write --plugin=prettier-plugin-solidity 'src/**/*.sol' 'test/helpers/**/*.ts' 'docs/templates/**/*.ts' 'README.md' 'docs/**/*.md' 'test/**/*.md'",
     "test": "forge test -vvv",
-    "sign-order": "tsx test/seaport-test.ts sign single",
-    "sign-bulk-order": "tsx test/seaport-test.ts sign bulk",
-    "export-signed-order": "tsx test/seaport-test.ts export single"
+    "sign-order": "tsx test/helpers/seaport-test.ts sign single",
+    "sign-bulk-order": "tsx test/helpers/seaport-test.ts sign bulk",
+    "export-signed-order": "tsx test/helpers/seaport-test.ts export single",
+    "sign-order-custom-bulk": "tsx test/helpers/custom-bulk-seaport-test.ts sign single",
+    "sign-bulk-order-custom-bulk": "tsx test/helpers/custom-bulk-seaport-test.ts sign bulk"
   },
   "keywords": [],
   "author": "",
